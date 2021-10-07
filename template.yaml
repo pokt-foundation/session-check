@@ -1,0 +1,35 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  session-check-service
+
+  SAM Template for session check service
+  
+Parameters:
+  ProjectName:
+    Type: String
+    Default: session-checker
+  
+Globals:
+  Function:
+    Timeout: 180
+
+Resources:
+  SetupSessionCheck:
+    Type: AWS::Serverless::Function 
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      FunctionName: setup-session-check 
+      Description: Perfoms the data gathering and control flow of session check
+      CodeUri: app/
+      Handler: dist/functions/setup-session-check/app.handler
+      Runtime: nodejs14.x
+      MemorySize: 500
+      Policies:
+        - "AWSLambdaVPCAccessExecutionRole"
+
+Outputs:
+  GatherSessionInfo:
+    Description: "Setup Session Check Lambda Function ARN"
+    Value: !GetAtt SetupSessionCheck.Arn
