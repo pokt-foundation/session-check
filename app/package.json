@@ -12,7 +12,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/pokt-foundation/notification-service.git"
+    "url": "git+https://github.com/pokt-foundation/session-check.git"
   },
   "keywords": [
     "pocket-network"
@@ -20,9 +20,9 @@
   "author": "",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/pokt-foundation/notification-service/issues"
+    "url": "https://github.com/pokt-foundation/session-check/issues"
   },
-  "homepage": "https://github.com/pokt-foundation/notification-service#readme",
+  "homepage": "https://github.com/pokt-foundation/session-check#readme",
   "devDependencies": {
     "@types/ioredis": "^4.27.6",
     "@types/node": "^16.7.1",
@@ -35,6 +35,7 @@
   "dependencies": {
     "@pokt-network/pocket-js": "^0.6.16-rc",
     "ioredis": "^4.27.11",
-    "mongoose": "^6.0.10"
+    "mongoose": "^6.0.10",
+    "pocket-tools": "^0.2.1"
   }
 }

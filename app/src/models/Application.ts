@@ -74,17 +74,6 @@ const applicationSchema = new Schema<IApplication>(
       whitelistOrigins: [],
       whitelistUserAgents: [],
     },
-    notificationSettings: {
-      signedUp: Boolean,
-      quarter: Boolean,
-      quarterLastSent: Date,
-      half: Boolean,
-      halfLastSent: Date,
-      threeQuarters: Boolean,
-      threeQuartersLastSent: Date,
-      full: Boolean,
-      fullLastSent: Date,
-    },
     createdAt: {
       type: Date,
       default: new Date(Date.now()),
