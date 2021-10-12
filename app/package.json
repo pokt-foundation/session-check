@@ -24,8 +24,10 @@
   },
   "homepage": "https://github.com/pokt-foundation/session-check#readme",
   "devDependencies": {
+    "@types/extract-domain": "^2.3.1",
     "@types/ioredis": "^4.27.6",
     "@types/node": "^16.7.1",
+    "@types/shortid": "^0.0.29",
     "@typescript-eslint/eslint-plugin": "^4.9.1",
     "@typescript-eslint/parser": "^4.9.1",
     "eslint": "^7.15.0",
@@ -34,8 +36,11 @@
   },
   "dependencies": {
     "@pokt-network/pocket-js": "^0.6.16-rc",
+    "axios": "^0.22.0",
+    "extract-domain": "^2.3.4",
     "ioredis": "^4.27.11",
     "mongoose": "^6.0.10",
-    "pocket-tools": "^0.2.1"
+    "pocket-tools": "^0.2.1",
+    "shortid": "^2.2.16"
   }
 }
