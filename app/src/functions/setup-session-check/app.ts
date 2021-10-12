@@ -83,8 +83,6 @@ exports.handler = async () => {
     publicKeyChainsMap.set(ntApp.publicKey, ntApp.chains)
   }
 
-  const app1 = apps.find(a => a.name === 'local-development')
-
   const syncCheckPromises: Promise<Node[]>[] = []
 
   let pocket = new Pocket(getPocketDispatchers(), getRPCProvider(), getPocketConfig())
@@ -105,7 +103,7 @@ exports.handler = async () => {
       if (!blockchain) {
         continue
       }
-      syncCheckPromises.push(syncCheckApp(pocket, blockchain, app1 as IApplication, requestID))
+      syncCheckPromises.push(syncCheckApp(pocket, blockchain, app as IApplication, requestID))
     }
   }
 
