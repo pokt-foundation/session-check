@@ -468,7 +468,7 @@ export class SyncChecker {
       pocketConfiguration.maxDispatchers,
       pocketConfiguration.maxSessions,
       pocketConfiguration.consensusNodeCount,
-      4000,
+      8000,
       pocketConfiguration.acceptDisputedResponses,
       pocketConfiguration.sessionBlockFrequency,
       pocketConfiguration.blockTime,

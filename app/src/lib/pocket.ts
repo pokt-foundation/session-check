@@ -13,7 +13,7 @@ const defaultConfig = {
   maxDispatchers: 20,
   maxSessions: 100000,
   consensusNodeCount: 5,
-  requestTimeout: 8000, // 8 seconds
+  requestTimeout: 12000, // 12 seconds
   acceptDisputedResponses: false,
   sessionBlockFrequency: 4,
   blockTime: 1038000,

@@ -1,9 +1,8 @@
 import connect from '../../lib/db'
 import ApplicationModel, { IApplication } from '../../models/Application';
 import Redis from 'ioredis'
-import { Pocket, PocketAAT, Session } from '@pokt-network/pocket-js';
+import { Pocket, PocketAAT, Session, Node } from '@pokt-network/pocket-js';
 import { getPocketDispatchers, getRPCProvider, getPocketConfig, unlockAccount, getAppsInNetwork } from '../../lib/pocket';
-import { getApps } from 'pocket-tools'
 import { SyncChecker } from '../../lib/sync-checker';
 import shortID from 'shortid'
 import ChainModel, { IChain } from '../../models/Blockchain';
@@ -17,7 +16,7 @@ const DEFAULT_SYNC_ALLOWANCE: number = parseInt(process.env.DEFAULT_SYNC_ALLOWAN
 
 const redis = new Redis(parseInt(REDIS_PORT), REDIS_HOST)
 
-async function syncCheckApp(pocket: Pocket, blockchain: IChain, application: IApplication, requestID: string) {
+async function syncCheckApp(pocket: Pocket, blockchain: IChain, application: IApplication, requestID: string): Promise<Node[]> {
   const aatParams: [string, string, string, string] = [
     application.gatewayAAT.version,
     application.gatewayAAT.clientPublicKey,
@@ -46,7 +45,7 @@ async function syncCheckApp(pocket: Pocket, blockchain: IChain, application: IAp
 
   syncCheckOptions.body = syncCheckOptions.body ? syncCheckOptions.body.replace(/\\"/g, '"') : ''
 
-  const nodes = syncChecker.consensusFilter({
+  const nodes = await syncChecker.consensusFilter({
     pocket,
     requestID,
     pocketAAT,
@@ -71,20 +70,46 @@ exports.handler = async () => {
   const apps = await ApplicationModel.find()
 
   const blockchains = await ChainModel.find()
+  const blockchainsMap: Map<string, IChain> = new Map<string, IChain>()
+
+  for (const blockchain of blockchains) {
+    blockchainsMap.set(blockchain._id, blockchain)
+  }
 
   const networkApps = await getAppsInNetwork()
+  const publicKeyChainsMap: Map<string, string[]> = new Map<string, string[]>()
 
-  const app = apps.find(a => a.name === 'local-development')
-  // @ts-ignore
-  const nt = networkApps.find(n => n.publicKey === app.gatewayAAT.applicationPublicKey)
+  for (const ntApp of networkApps) {
+    publicKeyChainsMap.set(ntApp.publicKey, ntApp.chains)
+  }
 
-  const blockchain = await blockchains.find(bl => bl._id === '0023')
+  const app1 = apps.find(a => a.name === 'local-development')
+
+  const syncCheckPromises: Promise<Node[]>[] = []
 
   let pocket = new Pocket(getPocketDispatchers(), getRPCProvider(), getPocketConfig())
 
   pocket = await unlockAccount(pocket)
 
-  const nodes = await syncCheckApp(pocket, blockchain as IChain, app as IApplication, '1234')
+  // Only perform sync check on apps made usingthe gateway
+  const gatewayApps = apps.filter((app) => publicKeyChainsMap.get(app?.gatewayAAT?.applicationPublicKey))
 
-  return { 'message': nodes }
+  for (const app of gatewayApps) {
+    const chains = publicKeyChainsMap.get(app?.gatewayAAT?.applicationPublicKey || '')
+    if (!chains) {
+      continue
+    }
+
+    for (const chain of chains) {
+      const blockchain = blockchainsMap.get(chain)
+      if (!blockchain) {
+        continue
+      }
+      syncCheckPromises.push(syncCheckApp(pocket, blockchain, app1 as IApplication, requestID))
+    }
+  }
+
+  await Promise.allSettled(syncCheckPromises)
+
+  return { 'message': 'nodes' }
 }
