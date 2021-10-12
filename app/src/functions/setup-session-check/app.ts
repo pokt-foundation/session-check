@@ -9,9 +9,7 @@ import ChainModel, { IChain } from '../../models/Blockchain';
 
 const REDIS_HOST = process.env.REDIS_HOST || 'redis'
 const REDIS_PORT = process.env.REDIS_PORT || '6379'
-
 const ALTRUISTS = JSON.parse(process.env.ALTRUISTS || '{}')
-
 const DEFAULT_SYNC_ALLOWANCE: number = parseInt(process.env.DEFAULT_SYNC_ALLOWANCE || '') || 5
 
 const redis = new Redis(parseInt(REDIS_PORT), REDIS_HOST)
@@ -45,6 +43,20 @@ async function syncCheckApp(pocket: Pocket, blockchain: IChain, application: IAp
 
   syncCheckOptions.body = syncCheckOptions.body ? syncCheckOptions.body.replace(/\\"/g, '"') : ''
 
+  const syncCheckKey = `sync-check-${sessionKey}`
+
+  // Cache is stale, start a new cache fill
+  // First check cache lock key; if lock key exists, return full node set
+  const syncLock = await redis.get('lock-' + syncCheckKey)
+
+  if (syncLock) {
+    return sessionNodes
+  } else {
+    // Set lock as this thread checks the sync with 60 second ttl.
+    // If any major errors happen below, it will retry the sync check every 60 seconds.
+    await redis.set('lock-' + syncCheckKey, 'true', 'EX', 60)
+  }
+
   const nodes = await syncChecker.consensusFilter({
     pocket,
     requestID,
@@ -58,6 +70,23 @@ async function syncCheckApp(pocket: Pocket, blockchain: IChain, application: IAp
     applicationPublicKey: application.gatewayAAT.applicationPublicKey,
     pocketConfiguration: getPocketConfig(),
   })
+
+  // Erase failure mark of synced nodes
+  for (const node of nodes) {
+    await redis.set(
+      blockchain._id + '-' + node.publicKey + '-failure',
+      'false',
+      'EX',
+      60 * 60 * 24 * 30
+    )
+  }
+
+  await redis.set(
+    syncCheckKey,
+    JSON.stringify(nodes.map(node => node.publicKey)),
+    'EX',
+    nodes.length > 0 ? 300 : 30 // will retry sync check every 30 seconds if no nodes are in sync
+  )
 
   return nodes
 }
@@ -83,14 +112,14 @@ exports.handler = async () => {
     publicKeyChainsMap.set(ntApp.publicKey, ntApp.chains)
   }
 
-  const syncCheckPromises: Promise<Node[]>[] = []
-
   let pocket = new Pocket(getPocketDispatchers(), getRPCProvider(), getPocketConfig())
 
   pocket = await unlockAccount(pocket)
 
-  // Only perform sync check on apps made usingthe gateway
+  // Only perform sync check on apps made using the gateway
   const gatewayApps = apps.filter((app) => publicKeyChainsMap.get(app?.gatewayAAT?.applicationPublicKey))
+
+  const syncCheckPromises: Promise<Node[]>[] = []
 
   for (const app of gatewayApps) {
     const chains = publicKeyChainsMap.get(app?.gatewayAAT?.applicationPublicKey || '')

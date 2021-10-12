@@ -32,34 +32,9 @@ export class SyncChecker {
       syncCheckOptions.allowance : this.defaultSyncAllowance
 
     const syncedNodes: Node[] = []
-    let syncedNodesList: string[] = []
+    const syncedNodesList: string[] = []
 
     // Value is an array of node public keys that have passed sync checks for this session in the past 5 minutes
-    const syncedNodesKey = `sync-check-${sessionKey}`
-    const syncedNodesCached = await this.redis.get(syncedNodesKey)
-
-    if (syncedNodesCached) {
-      syncedNodesList = JSON.parse(syncedNodesCached)
-      for (const node of nodes) {
-        if (syncedNodesList.includes(node.publicKey)) {
-          syncedNodes.push(node)
-        }
-      }
-      // console.info('SYNC CHECK CACHE: ' + syncedNodes.length + ' nodes returned');
-      return syncedNodes
-    }
-
-    // Cache is stale, start a new cache fill
-    // First check cache lock key; if lock key exists, return full node set
-    const syncLock = await this.redis.get('lock-' + syncedNodesKey)
-
-    if (syncLock) {
-      return nodes
-    } else {
-      // Set lock as this thread checks the sync with 60 second ttl.
-      // If any major errors happen below, it will retry the sync check every 60 seconds.
-      await this.redis.set('lock-' + syncedNodesKey, 'true', 'EX', 60)
-    }
 
     // Fires all 5 sync checks synchronously then assembles the results
     const nodeSyncLogs = await this.getNodeSyncLogs(
@@ -177,7 +152,7 @@ export class SyncChecker {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       const allowedBlockHeight = nodeSyncLog.blockHeight + syncCheckOptions.allowance!
 
-      const { serviceURL, serviceDomain } = await getNodeNetworkData(this.redis, nodeSyncLog.node.publicKey, requestID)
+      const { serviceURL, serviceDomain } = await getNodeNetworkData(nodeSyncLog.node.publicKey, requestID)
 
       if (allowedBlockHeight >= currentBlockHeight && allowedBlockHeight >= altruistBlockHeight) {
         console.info(
@@ -194,14 +169,6 @@ export class SyncChecker {
             serviceDomain,
             sessionKey,
           }
-        )
-
-        // Erase failure mark
-        await this.redis.set(
-          blockchainID + '-' + nodeSyncLog.node.publicKey + '-failure',
-          'false',
-          'EX',
-          60 * 60 * 24 * 30
         )
 
         // In-sync: add to nodes list
@@ -233,12 +200,6 @@ export class SyncChecker {
       blockchainID,
       sessionKey,
     })
-    await this.redis.set(
-      syncedNodesKey,
-      JSON.stringify(syncedNodesList),
-      'EX',
-      syncedNodes.length > 0 ? 300 : 30 // will retry sync check every 30 seconds if no nodes are in sync
-    )
 
     // If one or more nodes of this session are not in sync, fire a consensus relay with the same check.
     // This will penalize the out-of-sync nodes and cause them to get slashed for reporting incorrect data.
@@ -382,7 +343,7 @@ export class SyncChecker {
       'synccheck'
     )
 
-    const { serviceURL, serviceDomain } = await getNodeNetworkData(this.redis, node.publicKey, requestID)
+    const { serviceURL, serviceDomain } = await getNodeNetworkData(node.publicKey, requestID)
 
     if (relayResponse instanceof RelayResponse && checkEnforcementJSON(relayResponse.payload)) {
       const payload = JSON.parse(relayResponse.payload) // object that may not include 'resultKey'
@@ -453,7 +414,7 @@ export class SyncChecker {
       pocketConfiguration.maxDispatchers,
       pocketConfiguration.maxSessions,
       5,
-      2000,
+      12000,
       false,
       pocketConfiguration.sessionBlockFrequency,
       pocketConfiguration.blockTime,
@@ -468,7 +429,7 @@ export class SyncChecker {
       pocketConfiguration.maxDispatchers,
       pocketConfiguration.maxSessions,
       pocketConfiguration.consensusNodeCount,
-      8000,
+      12000,
       pocketConfiguration.acceptDisputedResponses,
       pocketConfiguration.sessionBlockFrequency,
       pocketConfiguration.blockTime,

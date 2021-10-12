@@ -1,11 +1,16 @@
-import { Redis } from 'ioredis'
+import Redis from 'ioredis'
 import { getAddressFromPublicKey } from 'pocket-tools'
 import axios, { AxiosError } from 'axios'
 import extractDomain from 'extract-domain'
 
 const ALTRUIST_URL: string = JSON.parse(process.env.ALTRUISTS || '{}')?.['0001']
 
-export async function getNodeNetworkData(redis: Redis, publicKey: string, requestID?: string): Promise<NodeURLInfo> {
+const REDIS_HOST = process.env.REDIS_HOST || 'redis'
+const REDIS_PORT = process.env.REDIS_PORT || '6379'
+
+const redis = new Redis(parseInt(REDIS_PORT), REDIS_HOST)
+
+export async function getNodeNetworkData(publicKey: string, requestID?: string): Promise<NodeURLInfo> {
   let nodeUrl: NodeURLInfo = { serviceURL: '', serviceDomain: '' }
 
   // Might come empty or undefined on relay failure
