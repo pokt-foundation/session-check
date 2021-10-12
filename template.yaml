@@ -9,7 +9,22 @@ Parameters:
   ProjectName:
     Type: String
     Default: session-checker
-  
+  MongoDBConnectionString:
+    Type: String
+  Altruists:
+    Type: String
+  AccountPrivateKey:
+    Type: String
+  AccountPassphrase:
+    Type: String
+  # TODO: Change to string array
+  RedisHost:
+    Type: String
+  RedisPort:
+    Type: String
+  DefaultSyncAllowance:
+    Type: String
+
 Globals:
   Function:
     Timeout: 180
@@ -26,6 +41,15 @@ Resources:
       Handler: dist/functions/setup-session-check/app.handler
       Runtime: nodejs12.x
       MemorySize: 500
+      Environment:
+        Variables:
+          MONGODB_CONN_STR: !Ref MongoDBConnectionString
+          ALTRUISTS: !Ref Altruists
+          ACCOUNT_PRIVATE_KEY: !Ref AccountPrivateKey
+          ACCOUNT_PASSPHRASE: !Ref AccountPassphrase
+          REDIS_HOST: !Ref RedisHost
+          REDIS_PORT: !Ref RedisPort
+          DEFAULT_SYNC_ALLOWANCE: !Ref DefaultSyncAllowance
       Policies:
         - "AWSLambdaVPCAccessExecutionRole"
 
