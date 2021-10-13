@@ -7,12 +7,57 @@ import { SyncChecker } from '../../lib/sync-checker';
 import shortID from 'shortid'
 import ChainModel, { IChain } from '../../models/Blockchain';
 
-const REDIS_HOST = process.env.REDIS_HOST || 'redis'
-const REDIS_PORT = process.env.REDIS_PORT || '6379'
+const REDIS_HOSTS = (process.env.REDIS_HOSTS || 'localhost').split(',')
+const REDIS_PORTS = (process.env.REDIS_PORTS || '6379').split(',')
+
 const ALTRUISTS = JSON.parse(process.env.ALTRUISTS || '{}')
 const DEFAULT_SYNC_ALLOWANCE: number = parseInt(process.env.DEFAULT_SYNC_ALLOWANCE || '') || 5
 
-const redis = new Redis(parseInt(REDIS_PORT), REDIS_HOST)
+const redisInstances = REDIS_HOSTS.map((host, idx) => new Redis(parseInt(REDIS_PORTS[idx]), host))
+
+const redis = new Redis(parseInt(REDIS_PORTS[0]), REDIS_HOSTS[0])
+
+// Sets the same redis value to all the available instances
+async function multiSetRedis(instances: Redis.Redis[], key: string, value: string, expiryMode: string, ttl: number): Promise<void> {
+  const operations: Promise<"OK" | null>[] = []
+
+  for (const instance of instances) {
+    operations.push(instance.set(key, value, expiryMode, ttl))
+  }
+
+  await Promise.allSettled(operations)
+}
+
+type MultiGet = {
+  instance: Redis.Redis
+  value: string
+}
+
+/**
+ * Get the same redis value from all the available instances
+ * @param instances redis instances
+ * @param key key to search
+ * @return Array.{<Object>} instances and their respective values
+ */
+async function multiGetRedis(instances: Redis.Redis[], key: string): Promise<MultiGet[]> {
+  const operations: Promise<string | null>[] = []
+
+  for (const instance of instances) {
+    operations.push(instance.get(key))
+  }
+
+  const results = await Promise.allSettled(operations)
+
+  const succeeded: MultiGet[] = []
+
+  for (const [idx, result] of results.entries()) {
+    if (result.status === 'fulfilled' && result.value !== null) {
+      succeeded.push({ instance: instances[idx], value: result.value })
+    }
+  }
+
+  return succeeded
+}
 
 async function syncCheckApp(pocket: Pocket, blockchain: IChain, application: IApplication, requestID: string): Promise<Node[]> {
   const aatParams: [string, string, string, string] = [
@@ -36,7 +81,7 @@ async function syncCheckApp(pocket: Pocket, blockchain: IChain, application: IAp
 
   const { sessionKey, sessionNodes } = pocketSession
 
-  const syncChecker = new SyncChecker(redis, DEFAULT_SYNC_ALLOWANCE)
+  const syncChecker = new SyncChecker(DEFAULT_SYNC_ALLOWANCE)
 
   // @ts-ignore
   const { syncCheckOptions } = blockchain._doc
@@ -47,14 +92,17 @@ async function syncCheckApp(pocket: Pocket, blockchain: IChain, application: IAp
 
   // Cache is stale, start a new cache fill
   // First check cache lock key; if lock key exists, return full node set
-  const syncLock = await redis.get('lock-' + syncCheckKey)
+  const syncLock = await multiGetRedis(redisInstances, 'lock-' + syncCheckKey)
 
-  if (syncLock) {
+  // Removes instances that have a cache lock key
+  const instances = redisInstances.filter((ins => !syncLock.some((syncIns) => ins === syncIns.instance)))
+
+  if (instances.length === 0) {
     return sessionNodes
   } else {
     // Set lock as this thread checks the sync with 60 second ttl.
     // If any major errors happen below, it will retry the sync check every 60 seconds.
-    await redis.set('lock-' + syncCheckKey, 'true', 'EX', 60)
+    await multiSetRedis(instances, 'lock-' + syncCheckKey, 'true', 'EX', 60)
   }
 
   const nodes = await syncChecker.consensusFilter({
@@ -73,7 +121,7 @@ async function syncCheckApp(pocket: Pocket, blockchain: IChain, application: IAp
 
   // Erase failure mark of synced nodes
   for (const node of nodes) {
-    await redis.set(
+    await multiSetRedis(instances,
       blockchain._id + '-' + node.publicKey + '-failure',
       'false',
       'EX',
@@ -81,7 +129,8 @@ async function syncCheckApp(pocket: Pocket, blockchain: IChain, application: IAp
     )
   }
 
-  await redis.set(
+  await multiSetRedis(
+    instances,
     syncCheckKey,
     JSON.stringify(nodes.map(node => node.publicKey)),
     'EX',

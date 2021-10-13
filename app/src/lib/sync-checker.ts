@@ -5,11 +5,9 @@ import { checkEnforcementJSON, getNodeNetworkData } from '../utils'
 import axios from 'axios'
 
 export class SyncChecker {
-  redis: Redis
   defaultSyncAllowance: number
 
-  constructor(redis: Redis, defaultSyncAllowance: number) {
-    this.redis = redis
+  constructor(defaultSyncAllowance: number) {
     this.defaultSyncAllowance = defaultSyncAllowance
   }
 

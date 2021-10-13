@@ -1,11 +1,13 @@
 import { Pocket, Account, Configuration, HttpRpcProvider, PocketRpcProvider, Application } from '@pokt-network/pocket-js'
 import axios, { AxiosError } from 'axios'
 
+const ALTRUIST_URL: string = JSON.parse(process.env.ALTRUISTS || '{}')?.['0001']
+
 const clientPrivateKey: string = process.env.ACCOUNT_PRIVATE_KEY || ""
 // Cannot be empty or will result in an error
 const clientPassphrase: string = process.env.ACCOUNT_PASSPHRASE || 'placeholder'
 
-const DEFAULT_DISPATCHER_LIST = 'https://peer-1.nodes.pokt.network:4200'
+const DEFAULT_DISPATCHER_LIST = (process.env.DEFAULT_DISPATCHER_LIST || '')
   .split(',')
   .map((uri) => new URL(uri))
 
@@ -78,7 +80,7 @@ export async function getAppsInNetwork(): Promise<
     const {
       // @ts-ignore
       data: { result: apps },
-    } = await axios.post(`${DEFAULT_DISPATCHER_LIST.toString()}v1/query/apps`, {
+    } = await axios.post(`${ALTRUIST_URL}/v1/query/apps`, {
       opts: {
         page,
         per_page: perPage,

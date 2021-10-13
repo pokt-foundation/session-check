@@ -18,12 +18,14 @@ Parameters:
   AccountPassphrase:
     Type: String
   # TODO: Change to string array
-  RedisHost:
-    Type: String
-  RedisPort:
-    Type: String
+  RedisHosts:
+    Type: CommaDelimitedList
+  RedisPorts:
+    Type: CommaDelimitedList
   DefaultSyncAllowance:
     Type: String
+  DefaultDispatcherList:
+    Type: CommaDelimitedList
 
 Globals:
   Function:
@@ -47,9 +49,10 @@ Resources:
           ALTRUISTS: !Ref Altruists
           ACCOUNT_PRIVATE_KEY: !Ref AccountPrivateKey
           ACCOUNT_PASSPHRASE: !Ref AccountPassphrase
-          REDIS_HOST: !Ref RedisHost
-          REDIS_PORT: !Ref RedisPort
+          REDIS_HOSTS: !Ref RedisHosts
+          REDIS_PORTS: !Ref RedisPorts
           DEFAULT_SYNC_ALLOWANCE: !Ref DefaultSyncAllowance
+          DEFAULT_DISPATCHER_LIST: !Ref DefaultDispatcherList
       Policies:
         - "AWSLambdaVPCAccessExecutionRole"
 
