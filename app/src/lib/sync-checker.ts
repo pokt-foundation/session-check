@@ -1,5 +1,4 @@
 import { Configuration, HTTPMethod, Node, Pocket, PocketAAT, RelayResponse } from '@pokt-network/pocket-js'
-import { Redis } from 'ioredis'
 import { checkEnforcementJSON, getNodeNetworkData } from '../utils'
 
 import axios from 'axios'

@@ -6,6 +6,7 @@ import { getPocketDispatchers, getRPCProvider, getPocketConfig, unlockAccount, g
 import { SyncChecker } from '../../lib/sync-checker';
 import shortID from 'shortid'
 import ChainModel, { IChain } from '../../models/Blockchain';
+import axios from 'axios';
 
 const REDIS_HOSTS = (process.env.REDIS_HOSTS || 'localhost').split(',')
 const REDIS_PORTS = (process.env.REDIS_PORTS || '6379').split(',')
@@ -13,9 +14,12 @@ const REDIS_PORTS = (process.env.REDIS_PORTS || '6379').split(',')
 const ALTRUISTS = JSON.parse(process.env.ALTRUISTS || '{}')
 const DEFAULT_SYNC_ALLOWANCE: number = parseInt(process.env.DEFAULT_SYNC_ALLOWANCE || '') || 5
 
-const redisInstances = REDIS_HOSTS.map((host, idx) => new Redis(parseInt(REDIS_PORTS[idx]), host))
+let redisInstances: Redis.Redis[] = []
 
-const redis = new Redis(parseInt(REDIS_PORTS[0]), REDIS_HOSTS[0])
+type MultiGet = {
+  instance: Redis.Redis
+  value: string
+}
 
 // Sets the same redis value to all the available instances
 async function multiSetRedis(instances: Redis.Redis[], key: string, value: string, expiryMode: string, ttl: number): Promise<void> {
@@ -26,11 +30,6 @@ async function multiSetRedis(instances: Redis.Redis[], key: string, value: strin
   }
 
   await Promise.allSettled(operations)
-}
-
-type MultiGet = {
-  instance: Redis.Redis
-  value: string
 }
 
 /**
@@ -141,6 +140,14 @@ async function syncCheckApp(pocket: Pocket, blockchain: IChain, application: IAp
 }
 
 exports.handler = async () => {
+  // @ts-ignore
+  const { data: { commit } } = await axios.get('http://localhost:3000/version')
+
+  console.log(commit)
+  redisInstances = REDIS_HOSTS.map((host, idx) => new Redis(parseInt(REDIS_PORTS[idx]), host, {
+    keyPrefix: commit
+  }))
+
   await connect()
 
   const requestID = shortID.generate()
