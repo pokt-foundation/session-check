@@ -29,7 +29,7 @@ Parameters:
 
 Globals:
   Function:
-    Timeout: 180
+    Timeout: 600
 
 Resources:
   SetupSessionCheck:
@@ -41,7 +41,7 @@ Resources:
       Description: Perfoms the data gathering and control flow of session check
       CodeUri: app/
       Handler: dist/functions/setup-session-check/app.handler
-      Runtime: nodejs12.x
+      Runtime: nodejs14.x
       MemorySize: 500
       Environment:
         Variables:

@@ -1,6 +1,7 @@
 {
   "name": "session-check",
   "version": "1.0.0",
+  "type": "module",
   "description": "primer for pocket network's session so they always stays healthy",
   "main": "index.js",
   "scripts": {
@@ -40,6 +41,7 @@
     "extract-domain": "^2.3.4",
     "ioredis": "^4.27.11",
     "mongoose": "^6.0.10",
+    "p-limit": "^3.0.0",
     "pocket-tools": "^0.2.1",
     "shortid": "^2.2.16"
   }

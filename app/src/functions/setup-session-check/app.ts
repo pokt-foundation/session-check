@@ -7,14 +7,15 @@ import { SyncChecker } from '../../lib/sync-checker';
 import shortID from 'shortid'
 import ChainModel, { IChain } from '../../models/Blockchain';
 import axios from 'axios';
+import pLimit from 'p-limit'
 
 const REDIS_HOSTS = (process.env.REDIS_HOSTS || 'localhost').split(',')
 const REDIS_PORTS = (process.env.REDIS_PORTS || '6379').split(',')
-
 const ALTRUISTS = JSON.parse(process.env.ALTRUISTS || '{}')
 const DEFAULT_SYNC_ALLOWANCE: number = parseInt(process.env.DEFAULT_SYNC_ALLOWANCE || '') || 5
 
 let redisInstances: Redis.Redis[] = []
+const limit = pLimit(500)
 
 type MultiGet = {
   instance: Redis.Redis
@@ -75,7 +76,7 @@ async function syncCheckApp(pocket: Pocket, blockchain: IChain, application: IAp
   )
 
   if (!(pocketSession instanceof Session)) {
-    throw new Error(`unable to obtain a session for ${application.gatewayAAT.applicationPublicKey}`)
+    throw new Error(`unable to obtain a session for ${application.gatewayAAT.applicationPublicKey} on blockchain: ${blockchain._id}`)
   }
 
   const { sessionKey, sessionNodes } = pocketSession
@@ -175,7 +176,7 @@ exports.handler = async () => {
   // Only perform sync check on apps made using the gateway
   const gatewayApps = apps.filter((app) => publicKeyChainsMap.get(app?.gatewayAAT?.applicationPublicKey))
 
-  const syncCheckPromises: Promise<Node[]>[] = []
+  const syncCheckPromises: PromiseLike<Node[]>[] = []
 
   for (const app of gatewayApps) {
     const chains = publicKeyChainsMap.get(app?.gatewayAAT?.applicationPublicKey || '')
@@ -188,7 +189,7 @@ exports.handler = async () => {
       if (!blockchain) {
         continue
       }
-      syncCheckPromises.push(syncCheckApp(pocket, blockchain, app as IApplication, requestID))
+      syncCheckPromises.push(limit(() => syncCheckApp(pocket, blockchain, app as IApplication, requestID)))
     }
   }
 
