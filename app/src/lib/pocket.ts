@@ -1,9 +1,16 @@
-import { Pocket, Account, Configuration, HttpRpcProvider, PocketRpcProvider, Application } from '@pokt-network/pocket-js'
+import {
+  Pocket,
+  Account,
+  Configuration,
+  HttpRpcProvider,
+  PocketRpcProvider,
+  Application,
+} from '@pokt-network/pocket-js'
 import axios, { AxiosError } from 'axios'
 
 const ALTRUIST_URL: string = JSON.parse(process.env.ALTRUISTS || '{}')?.['0001']
 
-const clientPrivateKey: string = process.env.ACCOUNT_PRIVATE_KEY || ""
+const clientPrivateKey: string = process.env.ACCOUNT_PRIVATE_KEY || ''
 // Cannot be empty or will result in an error
 const clientPassphrase: string = process.env.ACCOUNT_PASSPHRASE || 'placeholder'
 
@@ -45,17 +52,24 @@ export function getPocketConfig(): Configuration {
     defaultConfig.maxSessionRefreshRetries,
     defaultConfig.validateRelayResponses,
     defaultConfig.rejectSelfSignedCertificates,
-    defaultConfig.useLegacyTxCodec,
+    defaultConfig.useLegacyTxCodec
   )
 }
 
 // Unlock client account for relay signing
 export async function unlockAccount(pocket: Pocket): Promise<Pocket> {
   try {
-    const importAccount = await pocket.keybase.importAccount(Buffer.from(clientPrivateKey, 'hex'), clientPassphrase)
+    const importAccount = await pocket.keybase.importAccount(
+      Buffer.from(clientPrivateKey, 'hex'),
+      clientPassphrase
+    )
 
     if (importAccount instanceof Account) {
-      await pocket.keybase.unlockAccount(importAccount.addressHex, clientPassphrase, 0)
+      await pocket.keybase.unlockAccount(
+        importAccount.addressHex,
+        clientPassphrase,
+        0
+      )
     } else {
       throw importAccount as Error
     }

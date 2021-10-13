@@ -1,18 +1,25 @@
 import connect from '../../lib/db'
-import ApplicationModel, { IApplication } from '../../models/Application';
+import ApplicationModel, { IApplication } from '../../models/Application'
 import Redis from 'ioredis'
-import { Pocket, PocketAAT, Session, Node } from '@pokt-network/pocket-js';
-import { getPocketDispatchers, getRPCProvider, getPocketConfig, unlockAccount, getAppsInNetwork } from '../../lib/pocket';
-import { SyncChecker } from '../../lib/sync-checker';
+import { Pocket, PocketAAT, Session, Node } from '@pokt-network/pocket-js'
+import {
+  getPocketDispatchers,
+  getRPCProvider,
+  getPocketConfig,
+  unlockAccount,
+  getAppsInNetwork,
+} from '../../lib/pocket'
+import { SyncChecker } from '../../lib/sync-checker'
 import shortID from 'shortid'
-import ChainModel, { IChain } from '../../models/Blockchain';
-import axios from 'axios';
+import ChainModel, { IChain } from '../../models/Blockchain'
+import axios from 'axios'
 import pLimit from 'p-limit'
 
 const REDIS_HOSTS = (process.env.REDIS_HOSTS || 'localhost').split(',')
 const REDIS_PORTS = (process.env.REDIS_PORTS || '6379').split(',')
 const ALTRUISTS = JSON.parse(process.env.ALTRUISTS || '{}')
-const DEFAULT_SYNC_ALLOWANCE: number = parseInt(process.env.DEFAULT_SYNC_ALLOWANCE || '') || 5
+const DEFAULT_SYNC_ALLOWANCE: number =
+  parseInt(process.env.DEFAULT_SYNC_ALLOWANCE || '') || 5
 
 let redisInstances: Redis.Redis[] = []
 const limit = pLimit(500)
@@ -23,8 +30,14 @@ type MultiGet = {
 }
 
 // Sets the same redis value to all the available instances
-async function multiSetRedis(instances: Redis.Redis[], key: string, value: string, expiryMode: string, ttl: number): Promise<void> {
-  const operations: Promise<"OK" | null>[] = []
+async function multiSetRedis(
+  instances: Redis.Redis[],
+  key: string,
+  value: string,
+  expiryMode: string,
+  ttl: number
+): Promise<void> {
+  const operations: Promise<'OK' | null>[] = []
 
   for (const instance of instances) {
     operations.push(instance.set(key, value, expiryMode, ttl))
@@ -39,7 +52,10 @@ async function multiSetRedis(instances: Redis.Redis[], key: string, value: strin
  * @param key key to search
  * @return Array.{<Object>} instances and their respective values
  */
-async function multiGetRedis(instances: Redis.Redis[], key: string): Promise<MultiGet[]> {
+async function multiGetRedis(
+  instances: Redis.Redis[],
+  key: string
+): Promise<MultiGet[]> {
   const operations: Promise<string | null>[] = []
 
   for (const instance of instances) {
@@ -59,7 +75,12 @@ async function multiGetRedis(instances: Redis.Redis[], key: string): Promise<Mul
   return succeeded
 }
 
-async function syncCheckApp(pocket: Pocket, blockchain: IChain, application: IApplication, requestID: string): Promise<Node[]> {
+async function syncCheckApp(
+  pocket: Pocket,
+  blockchain: IChain,
+  application: IApplication,
+  requestID: string
+): Promise<Node[]> {
   const aatParams: [string, string, string, string] = [
     application.gatewayAAT.version,
     application.gatewayAAT.clientPublicKey,
@@ -76,7 +97,9 @@ async function syncCheckApp(pocket: Pocket, blockchain: IChain, application: IAp
   )
 
   if (!(pocketSession instanceof Session)) {
-    throw new Error(`unable to obtain a session for ${application.gatewayAAT.applicationPublicKey} on blockchain: ${blockchain._id}`)
+    throw new Error(
+      `unable to obtain a session for ${application.gatewayAAT.applicationPublicKey} on blockchain: ${blockchain._id}`
+    )
   }
 
   const { sessionKey, sessionNodes } = pocketSession
@@ -86,7 +109,9 @@ async function syncCheckApp(pocket: Pocket, blockchain: IChain, application: IAp
   // @ts-ignore
   const { syncCheckOptions } = blockchain._doc
 
-  syncCheckOptions.body = syncCheckOptions.body ? syncCheckOptions.body.replace(/\\"/g, '"') : ''
+  syncCheckOptions.body = syncCheckOptions.body
+    ? syncCheckOptions.body.replace(/\\"/g, '"')
+    : ''
 
   const syncCheckKey = `sync-check-${sessionKey}`
 
@@ -94,8 +119,16 @@ async function syncCheckApp(pocket: Pocket, blockchain: IChain, application: IAp
   // First check cache lock key; if lock key exists, return full node set
   const syncLock = await multiGetRedis(redisInstances, 'lock-' + syncCheckKey)
 
-  // Removes instances that have a cache lock key
-  const instances = redisInstances.filter((ins => !syncLock.some((syncIns) => ins === syncIns.instance)))
+  // Also stop on instances that have a current sync check
+  const syncCheck = await multiGetRedis(redisInstances, syncCheckKey)
+
+  // Removes instances that have either a cache lock key or current sync check
+  let instances = redisInstances.filter(
+    (ins) => !syncLock.some((syncIns) => ins === syncIns.instance)
+  )
+  instances = redisInstances.filter(
+    (ins) => !syncCheck.some((syncIns) => ins === syncIns.instance)
+  )
 
   if (instances.length === 0) {
     return sessionNodes
@@ -121,7 +154,8 @@ async function syncCheckApp(pocket: Pocket, blockchain: IChain, application: IAp
 
   // Erase failure mark of synced nodes
   for (const node of nodes) {
-    await multiSetRedis(instances,
+    await multiSetRedis(
+      instances,
       blockchain._id + '-' + node.publicKey + '-failure',
       'false',
       'EX',
@@ -132,7 +166,7 @@ async function syncCheckApp(pocket: Pocket, blockchain: IChain, application: IAp
   await multiSetRedis(
     instances,
     syncCheckKey,
-    JSON.stringify(nodes.map(node => node.publicKey)),
+    JSON.stringify(nodes.map((node) => node.publicKey)),
     'EX',
     nodes.length > 0 ? 300 : 30 // will retry sync check every 30 seconds if no nodes are in sync
   )
@@ -142,12 +176,17 @@ async function syncCheckApp(pocket: Pocket, blockchain: IChain, application: IAp
 
 exports.handler = async () => {
   // @ts-ignore
-  const { data: { commit } } = await axios.get('http://localhost:3000/version')
+  const {
+    data: { commit },
+  } = await axios.get('http://localhost:3000/version')
 
   console.log(commit)
-  redisInstances = REDIS_HOSTS.map((host, idx) => new Redis(parseInt(REDIS_PORTS[idx]), host, {
-    keyPrefix: commit
-  }))
+  redisInstances = REDIS_HOSTS.map(
+    (host, idx) =>
+      new Redis(parseInt(REDIS_PORTS[idx]), host, {
+        keyPrefix: `${commit}-`,
+      })
+  )
 
   await connect()
 
@@ -169,31 +208,44 @@ exports.handler = async () => {
     publicKeyChainsMap.set(ntApp.publicKey, ntApp.chains)
   }
 
-  let pocket = new Pocket(getPocketDispatchers(), getRPCProvider(), getPocketConfig())
+  let pocket = new Pocket(
+    getPocketDispatchers(),
+    getRPCProvider(),
+    getPocketConfig()
+  )
 
   pocket = await unlockAccount(pocket)
 
   // Only perform sync check on apps made using the gateway
-  const gatewayApps = apps.filter((app) => publicKeyChainsMap.get(app?.gatewayAAT?.applicationPublicKey))
+  const gatewayApps = apps.filter((app) =>
+    publicKeyChainsMap.get(app?.gatewayAAT?.applicationPublicKey)
+  )
 
   const syncCheckPromises: PromiseLike<Node[]>[] = []
 
   for (const app of gatewayApps) {
-    const chains = publicKeyChainsMap.get(app?.gatewayAAT?.applicationPublicKey || '')
+    let chains = publicKeyChainsMap.get(
+      app?.gatewayAAT?.applicationPublicKey || ''
+    )
     if (!chains) {
       continue
     }
-
+    // Bitcoin is not supported at the moment.
+    chains = chains.filter((chain) => chain !== '0002')
     for (const chain of chains) {
       const blockchain = blockchainsMap.get(chain)
       if (!blockchain) {
         continue
       }
-      syncCheckPromises.push(limit(() => syncCheckApp(pocket, blockchain, app as IApplication, requestID)))
+      syncCheckPromises.push(
+        limit(() =>
+          syncCheckApp(pocket, blockchain, app as IApplication, requestID)
+        )
+      )
     }
   }
 
   await Promise.allSettled(syncCheckPromises)
 
-  return { 'message': 'nodes' }
+  return { message: 'nodes' }
 }

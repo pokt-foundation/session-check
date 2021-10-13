@@ -1,7 +1,6 @@
 {
   "name": "session-check",
   "version": "1.0.0",
-  "type": "module",
   "description": "primer for pocket network's session so they always stays healthy",
   "main": "index.js",
   "scripts": {

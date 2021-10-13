@@ -9,7 +9,10 @@ const REDIS_PORTS = (process.env.REDIS_PORTS || '6379').split(',')[0]
 
 const redis = new Redis(parseInt(REDIS_PORTS), REDIS_HOSTS)
 
-export async function getNodeNetworkData(publicKey: string, requestID?: string): Promise<NodeURLInfo> {
+export async function getNodeNetworkData(
+  publicKey: string,
+  requestID?: string
+): Promise<NodeURLInfo> {
   let nodeUrl: NodeURLInfo = { serviceURL: '', serviceDomain: '' }
 
   // Might come empty or undefined on relay failure
@@ -27,16 +30,29 @@ export async function getNodeNetworkData(publicKey: string, requestID?: string):
 
   try {
     // @ts-ignore
-    const { service_url } = (await axios.post(`${ALTRUIST_URL}/v1/query/node`, { address })).data
+    const { service_url } = (
+      await axios.post(`${ALTRUIST_URL}/v1/query/node`, { address })
+    ).data
 
-    nodeUrl = { serviceURL: service_url, serviceDomain: extractDomain(service_url) }
+    nodeUrl = {
+      serviceURL: service_url,
+      serviceDomain: extractDomain(service_url),
+    }
 
-    await redis.set(`node-${publicKey}`, JSON.stringify(nodeUrl), 'EX', 60 * 60 * 6) // 6 hours
+    await redis.set(
+      `node-${publicKey}`,
+      JSON.stringify(nodeUrl),
+      'EX',
+      60 * 60 * 6
+    ) // 6 hours
   } catch (e) {
-    console.warn(`Failure getting node network data: ${(e as AxiosError).message}`, {
-      serviceNode: publicKey,
-      requestID,
-    })
+    console.warn(
+      `Failure getting node network data: ${(e as AxiosError).message}`,
+      {
+        serviceNode: publicKey,
+        requestID,
+      }
+    )
   }
 
   return nodeUrl
