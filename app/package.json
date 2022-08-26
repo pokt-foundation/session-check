@@ -39,7 +39,7 @@
     "axios": "^0.22.0",
     "extract-domain": "^2.3.4",
     "ioredis": "^4.27.11",
-    "mongoose": "^6.0.10",
+    "mongoose": "^6.4.6",
     "p-limit": "^3.0.0",
     "pocket-tools": "^0.2.1",
     "shortid": "^2.2.16"
